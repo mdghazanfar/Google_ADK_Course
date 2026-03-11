@@ -1,0 +1,91 @@
+import warnings
+import os
+from dotenv import load_dotenv
+from google.adk.agents import Agent
+from google.adk.runners import Runner
+from google.adk.sessions import InMemorySessionService
+from google.adk.tools.langchain_tool import LangchainTool
+from langchain_community.tools import TavilySearchResults
+
+warnings.filterwarnings(
+    "ignore",
+    message='Field name "config_type" in "SequentialAgent" shadows an attribute in parent "BaseAgent"',
+)
+
+load_dotenv()
+os.getenv("TAVILA_API_KEY")
+
+APP_NAME = "search_agent_app"
+USER_ID = "user1234"
+SESSION_ID = "s12345"
+
+# Instantiate the LangChain tool
+tavily_tool_instance = TavilySearchResults(
+    max_results=5,
+    search_depth="advanced",
+    include_answer=True,
+    include_raw_content=True,
+    include_images=True,
+)
+
+# Wrap it with LangchainTool for ADK
+adk_tavily_tool = LangchainTool(tool=tavily_tool_instance)
+
+
+root_agent = Agent(
+    name="search_agent",
+    model="gemini-2.0-flash",
+    description="An agent that provides information by performing web search using TAVILY search tool.",
+    instruction="I can answer your questions by searching the internet. Ask me any thing",
+    tools=[adk_tavily_tool],
+)
+
+
+# Session and Runner
+async def setup_session_and_runner():
+    session_service = InMemorySessionService()
+
+    # Check if session already exists
+    try:
+        existing_session = await session_service.get_session(
+            app_name=APP_NAME, user_id=USER_ID, session_id=SESSION_ID
+        )
+        print(f"Using existing session: {existing_session.session_id}")
+        session = existing_session
+    except:
+        # Create new session with explicit ID
+        session = await session_service.create_session(
+            app_name=APP_NAME, user_id=USER_ID, session_id=SESSION_ID
+        )
+        print(f"Created new session: {session.session_id}")
+
+    # Verify the session ID matches what we expect
+    if session.session_id != SESSION_ID:
+        print(
+            f"WARNING: Expected session ID '{SESSION_ID}' but got '{session.session_id}'"
+        )
+    else:
+        print(f"SUCCESS: Session ID matches: {SESSION_ID}")
+
+    runner = Runner(
+        agent=root_agent, app_name=APP_NAME, session_service=session_service
+    )
+    return session, runner
+
+
+async def main():
+    print(f"Configuring session with ID: {SESSION_ID}")
+    session, runner = await setup_session_and_runner()
+    print(f"Final session details:")
+    print(f"  App Name: {session.app_name}")
+    print(f"  User ID: {session.user_id}")
+    print(f"  Session ID: {session.session_id}")
+    print(f"  State: {session.state}")
+
+
+if __name__ == "__main__":
+    import asyncio
+
+    asyncio.run(main())
+
+# what is cloud burst?

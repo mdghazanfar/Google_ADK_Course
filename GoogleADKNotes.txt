@@ -1,0 +1,217 @@
+Google API Key:
+https://aistudio.google.com/apikey
+
+A Google API key is a unique identifier that allows your application to make authorized requests to Google's services. 
+Think of it as a special access code that tells Google.
+If you set the environment variable GEMINI_API_KEY or GOOGLE_API_KEY, 
+the API key will automatically be picked up by the client when using one of the Gemini API libraries. 
+It's recommended that you set only one of those variables, but if both are set, GOOGLE_API_KEY takes precedence.
+
+For more information:
+https://ai.google.dev/gemini-api/docs/api-key
+Manage API Key - https://cloud.google.com/docs/authentication/api-keys
+
+Remember this: Agent state and memory with ADK -
+https://cloud.google.com/blog/topics/developers-practitioners/remember-this-agent-state-and-memory-with-adk
+
+adk web is a command-line tool that launches a browser-based interface to interact with ADK agents. 
+It dynamically loads your Python agent code, connects to external tools (via MCP),
+and test the agent behavior in real time.(UI)
+
+run the my-first-agent using the below command:
+adk web --no-reload
+
+--no-reload argument -> disables the auto-reload feature and avoids the problematic subprocess behavior, 
+allowing the web UI to launch successfully on Windows.
+
+When adk web is run without --no-reload, it tries to enable auto-reloading of the agent code whenever changes are detected. 
+This feature relies on Python’s asyncio and watchdog libraries to restart the server in the background.
+However, on Windows, this can trigger the following error:
+  NotImplementedError: _make_subprocess_transport() not implemented
+  This happens because:
+  Windows uses a different event loop policy (ProactorEventLoop) that doesn’t support certain subprocess operations 
+  used by the auto-reloader.  The auto-reload mechanism tries to spawn subprocesses in a way that’s incompatible 
+  with Windows’ asyncio backend.
+
+hence in windows use adk web --no-reload
+
+Note: Always execute the command from the Parent folder , rather than project folder
+In this case Project folder is my-first-agent so navigate to GOOGLEADKdEMOS
+
+Commands to execute in the terminal:
+  api_server  Starts a FastAPI server for agents.
+  create      Creates a new app in the current folder with prepopulated agent template.
+  deploy      Deploys agent to hosted environments.
+  eval        Evaluates an agent given the eval sets.
+  run         Runs an interactive CLI for a certain agent.
+  web         Starts a FastAPI server with Web UI for agents.
+
+Creating a project:
+--------------------
+Creates a new app in the current folder with prepopulated agent template.
+  APP_NAME: required, the folder of the agent source code.
+  Example:
+    adk create path/to/my_app
+Options:
+--------
+  --model TEXT    Optional. The model used for the root agent.
+  --api_key TEXT  Optional. The API Key needed to access the model, e.g. Google AI API Key.
+  --project TEXT  Optional. The Google Cloud Project for using VertexAI as backend.
+  --region TEXT   Optional. The Google Cloud Region for using VertexAI as backend.
+  --help          Show this message and exit.
+
+  https://google.github.io/adk-docs/api-reference/python/
+
+
+Tool:
+In the context of ADK, a Tool represents a specific capability provided to an AI agent, 
+enabling it to perform actions and interact with the world beyond its core text generation and reasoning abilities.
+What distinguishes capable agents from basic language models is often their effective use of tools.
+Technically, a tool is typically a modular code component—like a Python/ Java function,
+a class method, or even another specialized agent—designed to execute a distinct, predefined task. 
+
+Tool Types in ADK:
+------------------
+Function Tools: Tools created by you, tailored to your specific application's needs.
+Functions/Methods: Define standard synchronous functions or methods in your code (e.g., Python def).
+Agents-as-Tools: Use another, potentially specialized, agent as a tool for a parent agent.
+Long Running Function Tools: Support for tools that perform asynchronous operations or take significant time to complete.
+Built-in Tools: Ready-to-use tools provided by the framework for common tasks. 
+  Examples: Google Search, Code Execution, Retrieval-Augmented Generation (RAG).
+Third-Party Tools: Integrate tools seamlessly from popular external libraries. 
+  Examples: LangChain Tools, CrewAI Tools.
+
+Function tools:
+------------------
+Function tools are custom functions that you define in your code to perform specific tasks.
+  demo: 3-agent-sentiment
+
+
+Before going with built-in tools, let discuss about Session and memory
+
+user: userId
+Session: Session is the ADK object designed specifically to track and manage these individual conversation threads.
+         Represents a single, ongoing interaction between a user and your agent system.
+         A Session can also hold temporary data (State) relevant only during this conversation.
+
+Events: Event represent every significant occurrence during an agent's interaction lifecycle, 
+        from initial user input to the final response and all the steps in between.
+        Events are the primary way components communicate, 
+        state is managed, and control flow is directed.
+        It captures user messages, agent replies, requests to use tools (function calls), tool results, 
+        state changes, control signals, and errors.
+
+
+Session: InMemorySession() - To create the session use SessionService of google ADK
+The session service will create a session when ever the user starts the runners/agent Execution
+session detials like start the session, session updates, session termination will be stored in the Events.
+To access the events we have runners, configure the runners accordingly to retrieve the session details
+            eg: 5-agent-weatherandtime-session, Run the agent with Run button but not with adk web option, 
+                then it helps to load the logs of the session and events
+
+Built in tools:
+----------------------
+Ready-to-use tools provided by the framework for common tasks. 
+Examples include Google Search, Code Execution, and Retrieval-Augmented Generation (RAG).
+  demo: 6-agent-buildtool, Execute the agent with adk web --no-reload option
+        Send the query -> what is Google ADK
+        Once got the response from the LLM
+        On the dev UI -> Navigate to Trace and click on Invocations > what is Google ADK -> in that option click on call_llm 
+        Observe the Event, Request, Response and Graph options on the right hand side of the UI
+        Click on Event to see the events occured
+        Click on Request tab to see the  tools as part of config - JSON.Observe the JSON that it shows the google search tool.
+      
+
+Third party tools like LangChain, CrewAI
+----------------------------------------
+Tavily API using Langchain, in Google ADK
+  demo: 7-agent-langchaintool, Execute the agent with adk web --no-reload option
+        Send the query -> what is Cloud burst?
+        Once got the response from the LLM
+        On the dev UI -> Navigate to Trace and click on Invocations > what is Cloud burst? -> in that option click on call_llm 
+        Observe the Event, Request, Response and Graph options on the right hand side of the UI
+        Click on Event to see the events occured
+        Click on Request tab to see the  tools as part of config - JSON.Observe the JSON that it shows the Tavily search tool.
+
+
+ADK Runtime:
+Core component of execution - like a engine -
+once define the parts (agents, tools), and the Runtime handles how they connect and run together to fulfill a user's request.
+
+ADK Runtime operates on an Event loop, the loop between  Runner <-> Agent, LLMs, callbacks and tools
+Steps in the event loop:
+------------------------
+1. The Runner receives a user query and asks the main Agent to start processing.
+2. The Agent (and its associated logic) runs until it has something to report (like a response, a request to use a tool, or a state change) – it then yields or emits an Event.
+3. The Runner receives this Event, processes any associated actions (like saving state changes via Services), and forwards the event onwards (e.g., to the user interface).
+4. Only after the Runner has processed the event does the Agent's logic resume from where it paused, now potentially seeing the effects of the changes committed by the Runner.
+5. This cycle repeats until the agent has no more events to yield for the current user query.
+
+ADK Event Loop - Runner side:
+--------------------------------
+Step	                What the Runner Does	                                                     
+ADK Event Loop - Agent, Call back steps:
+-------------------------------------------
+Step	                              What Happens	                                            Easy Analogy
+1.        Execute	Your code runs using the current session state.	                    Like reading the latest notes before replying.
+2.        Yield	You send a message, tool call, or state update by yielding an Event.	Like saying, “Hey, I need to do this!”
+3.        Pause	Your code stops running right after the yield.	                      Like waiting for someone to confirm your request.
+4.        Resume	Your code resumes only after the system processes your event.	      Like continuing your task after getting the green light.
+5.        See Updated State	Now you can safely read the updated session state.	      Like checking your notebook after someone added new info.
+
+Source: https://google.github.io/adk-docs/runtime/
+
+
+Agents types in Google ADK 
+---------------------------
+LLM Agent - Its the agent till now covered
+Workflow Agents - Specialized agents 
+    Agent - Sub-agents
+    control the execution flow of agent with sub-agents
+      Workflow agent type:
+              Sequentail agents - Executes sub-agents one after another, in sequence
+              Loop Agents - Repeatedly executes its sub-agents until a specific termination condition is met
+              Parallel Agents - Executes sub-agents in Parallel
+
+Need of workflow agents - based on the use-case, where these agents are operate based on the predefined logic, 
+                          leads to deterministic and predicatable results.
+
+Sequential Agents: Context: Passes the same InvocationContext sequentially, 
+                  allowing agents to easily pass results via shared state.
+                  example: 8-agent-multiagent-sequential
+
+Loop Agents:  Executes its sub_agents sequentially in a loop.
+              Termination: The loop stops if the optional max_iterations is reached, 
+              or if any sub-agent returns an Event with escalate=True in it's Event Actions.
+              Context & State: Passes the same InvocationContext in each iteration, 
+              allowing state changes (e.g., counters, flags) to persist across loops.
+
+
+ParallelAgent: Executes its sub_agents in parallel. 
+                Events from sub-agents may be interleaved.
+                Context: Modifies the InvocationContext.branch for each child agent (e.g., ParentBranch.ChildName), 
+                providing a distinct contextual path which can be useful for isolating history in some memory implementations.
+                State: Despite different branches, all parallel children access the same shared session.state, 
+                enabling them to read initial state and write results (use distinct keys to avoid race conditions).
+                
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
